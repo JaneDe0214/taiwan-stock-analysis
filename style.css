@@ -208,6 +208,212 @@ h2 {
     border-left: 4px solid #c33;
 }
 
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.dashboard-section h3 {
+    color: #333;
+    margin-bottom: 15px;
+    font-size: 16px;
+}
+
+.index-item, .crypto-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    margin-bottom: 8px;
+}
+
+.index-name, .crypto-name {
+    font-weight: bold;
+    color: #333;
+}
+
+.index-value, .crypto-price {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.market-badge {
+    background: #667eea;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    margin-left: 8px;
+}
+
+.btn-ai {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.btn-ai:hover {
+    opacity: 0.9;
+}
+
+.analysis-container {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-top: 20px;
+}
+
+.analysis-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #667eea;
+}
+
+.current-price {
+    font-size: 24px;
+    font-weight: bold;
+    color: #667eea;
+}
+
+.indicators {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.indicator-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 15px;
+    margin-top: 10px;
+}
+
+.indicator-item {
+    text-align: center;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+.indicator-item span {
+    display: block;
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.indicator-item strong {
+    font-size: 18px;
+    color: #333;
+}
+
+.analysis-sections {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.analysis-box {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+}
+
+.signal-badge {
+    display: inline-block;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: bold;
+    margin: 10px 0;
+}
+
+.signal-buy {
+    background: #e74c3c;
+    color: white;
+}
+
+.signal-sell {
+    background: #27ae60;
+    color: white;
+}
+
+.signal-hold {
+    background: #95a5a6;
+    color: white;
+}
+
+.confidence {
+    font-size: 14px;
+    color: #666;
+    margin: 10px 0;
+}
+
+.price-targets {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin: 15px 0;
+}
+
+.target-item {
+    text-align: center;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+.target-item span {
+    display: block;
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.target-item strong {
+    font-size: 18px;
+}
+
+.trend-info {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 6px;
+    margin: 15px 0;
+}
+
+.trend-info div {
+    margin: 8px 0;
+}
+
+.reasons {
+    margin-top: 15px;
+}
+
+.reasons ul {
+    margin-top: 10px;
+    padding-left: 20px;
+}
+
+.reasons li {
+    margin: 5px 0;
+    color: #555;
+}
+
+.disclaimer {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    padding: 15px;
+    border-radius: 6px;
+    color: #856404;
+    font-size: 14px;
+}
+
 footer {
     text-align: center;
     color: white;
@@ -222,6 +428,18 @@ footer {
     }
     
     .movers-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .analysis-sections {
+        grid-template-columns: 1fr;
+    }
+    
+    .price-targets {
         grid-template-columns: 1fr;
     }
 }
