@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台股分析平台</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>📈 台股分析平台</h1>
+            <p>即時股市資訊 · 專業分析工具</p>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="dashboard">
+            <h2>🌐 全球市場儀表板</h2>
+            <div class="dashboard-grid">
+                <div class="dashboard-section">
+                    <h3>台股大盤</h3>
+                    <div id="marketInfo" class="info-card">
+                        <div class="loading">載入中...</div>
+                    </div>
+                </div>
+                <div class="dashboard-section">
+                    <h3>國際指數</h3>
+                    <div id="globalIndices" class="loading">載入中...</div>
+                </div>
+                <div class="dashboard-section">
+                    <h3>虛擬貨幣</h3>
+                    <div id="cryptoData" class="loading">載入中...</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="stock-search">
+            <h2>🔍 智能股票分析</h2>
+            <div class="search-box">
+                <input type="text" id="stockInput" placeholder="輸入股票代號 (例: 2330)">
+                <select id="marketSelect">
+                    <option value="tse">上市</option>
+                    <option value="otc">上櫃</option>
+                </select>
+                <button onclick="searchStock()">基本查詢</button>
+                <button onclick="analyzeStock()" class="btn-ai">AI分析</button>
+            </div>
+            <div id="stockResult"></div>
+            <div id="analysisResult"></div>
+        </section>
+
+        <section class="top-movers">
+            <h2>📈 漲跌排行</h2>
+            <div class="movers-container">
+                <div class="movers-box">
+                    <h3>📈 漲幅前十</h3>
+                    <div id="gainers" class="loading">載入中...</div>
+                </div>
+                <div class="movers-box">
+                    <h3>📉 跌幅前十</h3>
+                    <div id="losers" class="loading">載入中...</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>資料來源：台灣證券交易所 | 僅供參考，投資有風險</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
