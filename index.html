@@ -3,70 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>台股分析平台</title>
+    <title>專業股票分析平台 | 全球市場即時監控</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <header>
+    <nav class="navbar">
         <div class="container">
-            <h1>📈 台股分析平台</h1>
-            <p>即時股市資訊 · 專業分析工具</p>
+            <div class="nav-brand">
+                <i class="fas fa-chart-line"></i>
+                <span>智能股票分析平台</span>
+            </div>
+            <div class="nav-time" id="currentTime"></div>
         </div>
-    </header>
+    </nav>
 
-    <main class="container">
+    <div class="container">
+        <!-- 全球市場儀表板 -->
         <section class="dashboard">
-            <h2>🌐 全球市場儀表板</h2>
-            <div class="dashboard-grid">
-                <div class="dashboard-section">
-                    <h3>台股大盤</h3>
-                    <div id="marketInfo" class="info-card">
-                        <div class="loading">載入中...</div>
-                    </div>
-                </div>
-                <div class="dashboard-section">
-                    <h3>國際指數</h3>
-                    <div id="globalIndices" class="loading">載入中...</div>
-                </div>
-                <div class="dashboard-section">
-                    <h3>虛擬貨幣</h3>
-                    <div id="cryptoData" class="loading">載入中...</div>
-                </div>
+            <h2><i class="fas fa-globe"></i> 全球市場即時監控</h2>
+            <div class="market-grid" id="marketDashboard">
+                <div class="loading">載入中...</div>
             </div>
         </section>
 
-        <section class="stock-search">
-            <h2>🔍 智能股票分析</h2>
+        <!-- 股票查詢分析 -->
+        <section class="analysis-section">
+            <h2><i class="fas fa-search-dollar"></i> 智能股票分析</h2>
             <div class="search-box">
-                <input type="text" id="stockInput" placeholder="輸入股票代號 (例: 2330)">
-                <select id="marketSelect">
-                    <option value="tse">上市</option>
-                    <option value="otc">上櫃</option>
-                </select>
-                <button onclick="searchStock()">基本查詢</button>
-                <button onclick="analyzeStock()" class="btn-ai">AI分析</button>
+                <input type="text" id="stockInput" placeholder="輸入股票代號 (台股: 2330, 美股: AAPL, 加密貨幣: BTC)">
+                <button onclick="analyzeStock()"><i class="fas fa-brain"></i> AI 分析</button>
             </div>
-            <div id="stockResult"></div>
             <div id="analysisResult"></div>
         </section>
 
-        <section class="top-movers">
-            <h2>📈 漲跌排行</h2>
-            <div class="movers-container">
-                <div class="movers-box">
-                    <h3>📈 漲幅前十</h3>
-                    <div id="gainers" class="loading">載入中...</div>
-                </div>
-                <div class="movers-box">
-                    <h3>📉 跌幅前十</h3>
-                    <div id="losers" class="loading">載入中...</div>
-                </div>
-            </div>
+        <!-- 推薦股票 -->
+        <section class="recommendations">
+            <h2><i class="fas fa-star"></i> 今日推薦</h2>
+            <div id="recommendedStocks"></div>
         </section>
-    </main>
+    </div>
 
     <footer>
-        <p>資料來源：台灣證券交易所 | 僅供參考，投資有風險</p>
+        <p>⚠️ 本平台僅供參考，投資有風險，請謹慎評估</p>
+        <p>數據來源: Yahoo Finance, CoinGecko, TWSE | 更新頻率: 即時</p>
     </footer>
 
     <script src="app.js"></script>

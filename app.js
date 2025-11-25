@@ -1,479 +1,658 @@
-// 純前端實作 - 無需後端
-const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
-let autoRefreshInterval;
+// 全球市場配置
+const MARKETS = [
+    { id: 'twii', name: '台灣加權', symbol: '^TWII', icon: '🇹🇼', type: 'yahoo' },
+    { id: 'dji', name: '道瓊指數', symbol: '^DJI', icon: '🇺🇸', type: 'yahoo' },
+    { id: 'ixic', name: '那斯達克', symbol: '^IXIC', icon: '🇺🇸', type: 'yahoo' },
+    { id: 'hsi', name: '恆生指數', symbol: '^HSI', icon: '🇭🇰', type: 'yahoo' },
+    { id: 'n225', name: '日經指數', symbol: '^N225', icon: '🇯🇵', type: 'yahoo' },
+    { id: 'btc', name: 'Bitcoin', symbol: 'bitcoin', icon: '₿', type: 'crypto' },
+    { id: 'eth', name: 'Ethereum', symbol: 'ethereum', icon: '⟠', type: 'crypto' },
+    { id: 'gold', name: '黃金', symbol: 'GC=F', icon: '🥇', type: 'yahoo' }
+];
 
-// 載入台股大盤
-async function loadMarketInfo() {
+// 更新時間顯示
+function updateTime() {
+    const now = new Date();
+    document.getElementById('currentTime').textContent = now.toLocaleString('zh-TW', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+}
+setInterval(updateTime, 1000);
+updateTime();
+
+// 初始化儀表板
+async function initDashboard() {
+    const dashboard = document.getElementById('marketDashboard');
+    dashboard.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> 載入全球市場數據...</div>';
+    
     try {
-        const today = new Date().toISOString().slice(0,10).replace(/-/g, '');
-        const url = `https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=${today}&type=ALLBUT0999`;
-        const response = await fetch(CORS_PROXY + encodeURIComponent(url));
-        const data = await response.json();
+        const marketData = await Promise.all(MARKETS.map(market => fetchMarketData(market)));
+        renderDashboard(marketData);
         
-        if (data.stat === 'OK') {
-            const changeClass = parseFloat(data.data1[0][2]) >= 0 ? 'price-up' : 'price-down';
-            const changeSymbol = parseFloat(data.data1[0][2]) >= 0 ? '▲' : '▼';
-            
-            document.getElementById('marketInfo').innerHTML = `
-                <div class="info-item">
-                    <div class="label">加權指數</div>
-                    <div class="value">${data.data1[0][1]}</div>
-                </div>
-                <div class="info-item">
-                    <div class="label">漲跌</div>
-                    <div class="value ${changeClass}">${changeSymbol} ${data.data1[0][2]}</div>
-                </div>
-                <div class="info-item">
-                    <div class="label">成交量 (億)</div>
-                    <div class="value">${(parseFloat(data.data1[0][4]) / 100000000).toFixed(0)}</div>
-                </div>
-            `;
-        }
+        // 每30秒更新一次
+        setInterval(async () => {
+            const updatedData = await Promise.all(MARKETS.map(market => fetchMarketData(market)));
+            renderDashboard(updatedData);
+        }, 30000);
     } catch (error) {
-        document.getElementById('marketInfo').innerHTML = '<div class="error">載入失敗</div>';
+        dashboard.innerHTML = '<div class="loading">⚠️ 載入失敗，請重新整理頁面</div>';
     }
 }
 
-// 載入國際指數（Yahoo Finance API）
-async function loadGlobalIndices() {
-    const indices = [
-        { name: '道瓊指數', symbol: '^DJI' },
-        { name: 'S&P 500', symbol: '^GSPC' },
-        { name: '那斯達克', symbol: '^IXIC' },
-        { name: '日經指數', symbol: '^N225' },
-        { name: '恆生指數', symbol: '^HSI' }
-    ];
-    
-    let html = '';
-    for (const idx of indices) {
-        try {
-            const url = `https://query1.finance.yahoo.com/v8/finance/chart/${idx.symbol}?interval=1d&range=1d`;
-            const response = await fetch(url);
+// 獲取市場數據
+async function fetchMarketData(market) {
+    try {
+        if (market.type === 'crypto') {
+            const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${market.symbol}&vs_currencies=usd&include_24hr_change=true`);
             const data = await response.json();
-            const quote = data.chart.result[0].meta;
-            const change = ((quote.regularMarketPrice - quote.previousClose) / quote.previousClose * 100).toFixed(2);
-            const trendClass = parseFloat(change) >= 0 ? 'price-up' : 'price-down';
-            const trendSymbol = parseFloat(change) >= 0 ? '▲' : '▼';
-            
-            html += `
-                <div class="index-item">
-                    <div class="index-name">${idx.name}</div>
-                    <div class="index-value">${quote.regularMarketPrice.toFixed(2)}</div>
-                    <div class="${trendClass}">${trendSymbol} ${change}%</div>
-                </div>
-            `;
-        } catch (e) {
-            html += `<div class="index-item"><div class="index-name">${idx.name}</div><div>N/A</div></div>`;
-        }
-    }
-    document.getElementById('globalIndices').innerHTML = html;
-}
-
-// 載入虛擬貨幣
-async function loadCryptoData() {
-    try {
-        const url = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,binancecoin,ripple,cardano&vs_currencies=usd&include_24hr_change=true';
-        const response = await fetch(url);
-        const data = await response.json();
-        
-        const cryptos = [
-            { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC' },
-            { id: 'ethereum', name: 'Ethereum', symbol: 'ETH' },
-            { id: 'binancecoin', name: 'BNB', symbol: 'BNB' },
-            { id: 'ripple', name: 'XRP', symbol: 'XRP' },
-            { id: 'cardano', name: 'Cardano', symbol: 'ADA' }
-        ];
-        
-        document.getElementById('cryptoData').innerHTML = cryptos.map(coin => {
-            const price = data[coin.id]?.usd || 0;
-            const change = data[coin.id]?.usd_24h_change?.toFixed(2) || 0;
-            const changeClass = parseFloat(change) >= 0 ? 'price-up' : 'price-down';
-            const changeSymbol = parseFloat(change) >= 0 ? '▲' : '▼';
-            
-            return `
-                <div class="crypto-item">
-                    <div class="crypto-name">${coin.name} (${coin.symbol})</div>
-                    <div class="crypto-price">$${price.toLocaleString()}</div>
-                    <div class="${changeClass}">${changeSymbol} ${change}%</div>
-                </div>
-            `;
-        }).join('');
-    } catch (error) {
-        document.getElementById('cryptoData').innerHTML = '<div class="error">載入失敗</div>';
-    }
-}
-
-// 查詢個股
-async function searchStock() {
-    const symbol = document.getElementById('stockInput').value.trim();
-    const market = document.getElementById('marketSelect').value;
-    const resultDiv = document.getElementById('stockResult');
-    
-    if (!symbol) {
-        resultDiv.innerHTML = '<div class="error">請輸入股票代號</div>';
-        return;
-    }
-    
-    resultDiv.innerHTML = '<div class="loading">查詢中...</div>';
-    document.getElementById('analysisResult').innerHTML = '';
-    
-    try {
-        const today = new Date().toISOString().slice(0,10).replace(/-/g, '');
-        let url;
-        
-        if (market === 'otc') {
-            url = `https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_info/st43_result.php?l=zh-tw&d=${today.substring(0,7)}&stkno=${symbol}`;
+            const coinData = data[market.symbol];
+            return {
+                ...market,
+                price: coinData.usd,
+                change: coinData.usd_24h_change,
+                currency: 'USD'
+            };
         } else {
-            url = `https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date=${today}&stockNo=${symbol}`;
-        }
-        
-        const response = await fetch(CORS_PROXY + encodeURIComponent(url));
-        const data = await response.json();
-        
-        if (data.stat === 'OK' && data.data && data.data.length > 0) {
-            const latest = data.data[data.data.length - 1];
-            const changeNum = parseFloat(latest[7]);
-            const changeClass = changeNum >= 0 ? 'price-up' : 'price-down';
-            const changeSymbol = changeNum >= 0 ? '▲' : '▼';
+            const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${market.symbol}?interval=1d&range=1d`);
+            if (!response.ok) throw new Error('Failed to fetch');
+            const data = await response.json();
             
-            resultDiv.innerHTML = `
-                <div class="stock-detail">
-                    <div class="stock-header">
-                        <div>
-                            <div class="stock-title">${data.title?.split(' ')[0] || symbol} (${symbol}) <span class="market-badge">${market === 'otc' ? '上櫃' : '上市'}</span></div>
-                            <div style="color: #666; font-size: 14px;">${latest[0]}</div>
-                        </div>
-                        <div>
-                            <div class="stock-price ${changeClass}">${latest[6]}</div>
-                            <div class="${changeClass}" style="text-align: right;">${changeSymbol} ${latest[7]}</div>
-                        </div>
-                    </div>
-                    <div class="stock-stats">
-                        <div class="stat-item">
-                            <div class="stat-label">開盤</div>
-                            <div class="stat-value">${latest[3]}</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-label">最高</div>
-                            <div class="stat-value">${latest[4]}</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-label">最低</div>
-                            <div class="stat-value">${latest[5]}</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-label">成交量</div>
-                            <div class="stat-value">${(parseFloat(latest[1].replace(/,/g, '')) / 1000).toFixed(0)}K</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-label">成交筆數</div>
-                            <div class="stat-value">${latest[8]}</div>
-                        </div>
-                    </div>
-                </div>
-            `;
+            if (!data.chart || !data.chart.result || !data.chart.result[0]) {
+                throw new Error('Invalid data');
+            }
             
-            window.currentStockData = data.data.map(d => ({
-                date: d[0],
-                open: parseFloat(d[3]),
-                high: parseFloat(d[4]),
-                low: parseFloat(d[5]),
-                close: parseFloat(d[6]),
-                volume: parseInt(d[1].replace(/,/g, ''))
-            }));
-        } else {
-            resultDiv.innerHTML = '<div class="error">查無此股票代號</div>';
+            const quote = data.chart.result[0];
+            const meta = quote.meta;
+            const currentPrice = meta.regularMarketPrice;
+            const previousClose = meta.chartPreviousClose;
+            const change = ((currentPrice - previousClose) / previousClose) * 100;
+            
+            return {
+                ...market,
+                price: currentPrice,
+                change: change,
+                currency: meta.currency,
+                volume: meta.regularMarketVolume
+            };
         }
     } catch (error) {
-        resultDiv.innerHTML = '<div class="error">查詢失敗，請稍後再試</div>';
+        console.error(`Error fetching ${market.name}:`, error);
+        return { ...market, price: 0, change: 0, error: true };
     }
 }
 
-// AI 分析
+// 渲染儀表板
+function renderDashboard(marketData) {
+    const dashboard = document.getElementById('marketDashboard');
+    dashboard.innerHTML = marketData.map(market => {
+        if (market.error) return '';
+        
+        const isPositive = market.change >= 0;
+        const changeClass = isPositive ? 'positive' : 'negative';
+        const changeIcon = isPositive ? 'fa-arrow-up' : 'fa-arrow-down';
+        
+        return `
+            <div class="market-card">
+                <div class="market-header">
+                    <span class="market-name">${market.name}</span>
+                    <span class="market-icon">${market.icon}</span>
+                </div>
+                <div class="market-price">${formatPrice(market.price, market.currency)}</div>
+                <div class="market-change ${changeClass}">
+                    <i class="fas ${changeIcon}"></i>
+                    <span>${isPositive ? '+' : ''}${market.change.toFixed(2)}%</span>
+                </div>
+                ${market.volume ? `<div class="market-info">成交量: ${formatVolume(market.volume)}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+// 股票分析主函數
 async function analyzeStock() {
-    const symbol = document.getElementById('stockInput').value.trim();
-    const resultDiv = document.getElementById('analysisResult');
-    
-    if (!symbol || !window.currentStockData) {
-        resultDiv.innerHTML = '<div class="error">請先查詢股票</div>';
+    const input = document.getElementById('stockInput').value.trim().toUpperCase();
+    if (!input) {
+        alert('請輸入股票代號');
         return;
     }
     
-    resultDiv.innerHTML = '<div class="loading">AI 分析中...</div>';
+    const resultDiv = document.getElementById('analysisResult');
+    resultDiv.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> AI 分析中...</div>';
     
-    const history = window.currentStockData;
-    const latest = history[history.length - 1];
-    const prices = history.map(d => d.close);
-    
-    // 計算技術指標
-    const sma5 = calculateSMA(prices, 5);
-    const sma20 = calculateSMA(prices, 20);
-    const rsi = calculateRSI(prices, 14);
-    const macd = calculateMACD(prices);
-    
-    // 短線分析
-    const shortTerm = analyzeShortTerm(latest, sma5, sma20, rsi, macd);
-    
-    // 長線分析
-    const longTerm = analyzeLongTerm(prices, sma20, rsi);
-    
-    resultDiv.innerHTML = `
-        <div class="analysis-container">
-            <div class="analysis-header">
-                <h3>🤖 AI 智能分析：${symbol}</h3>
-                <div class="current-price">現價：${latest.close}</div>
+    try {
+        let stockData;
+        const lowerInput = input.toLowerCase();
+        
+        // 判斷是台股、美股還是加密貨幣
+        if (/^\d{4}$/.test(input)) {
+            // 台股
+            stockData = await analyzeTWStock(input);
+        } else if (['bitcoin', 'btc', 'ethereum', 'eth', 'bnb', 'solana', 'cardano', 'dogecoin', 'ripple', 'xrp'].includes(lowerInput)) {
+            // 加密貨幣
+            const cryptoMap = {
+                'btc': 'bitcoin',
+                'eth': 'ethereum',
+                'xrp': 'ripple'
+            };
+            stockData = await analyzeCrypto(cryptoMap[lowerInput] || lowerInput);
+        } else {
+            // 美股
+            stockData = await analyzeUSStock(input);
+        }
+        
+        renderAnalysis(stockData);
+    } catch (error) {
+        console.error('Analysis error:', error);
+        resultDiv.innerHTML = `
+            <div class="loading">
+                ⚠️ 查詢失敗<br>
+                <small style="font-size: 0.9rem; margin-top: 0.5rem; display: block;">
+                    請確認：<br>
+                    • 台股請輸入4位數字（如：2330）<br>
+                    • 美股請輸入代碼（如：AAPL）<br>
+                    • 加密貨幣請輸入完整名稱（如：bitcoin）<br>
+                    • 確認網路連線正常
+                </small>
             </div>
-            
-            <div class="indicators">
-                <h4>技術指標</h4>
-                <div class="indicator-grid">
-                    <div class="indicator-item">
-                        <span>5日均線</span>
-                        <strong>${sma5.toFixed(2)}</strong>
-                    </div>
-                    <div class="indicator-item">
-                        <span>20日均線</span>
-                        <strong>${sma20.toFixed(2)}</strong>
-                    </div>
-                    <div class="indicator-item">
-                        <span>RSI</span>
-                        <strong>${rsi.toFixed(2)}</strong>
-                    </div>
-                    <div class="indicator-item">
-                        <span>MACD</span>
-                        <strong>${macd.toFixed(2)}</strong>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="analysis-sections">
-                <div class="analysis-box">
-                    <h4>📉 短線分析 (${shortTerm.period})</h4>
-                    <div class="signal-badge signal-${shortTerm.signal}">
-                        ${shortTerm.signal === 'buy' ? '建議買入' : shortTerm.signal === 'sell' ? '建議賣出' : '觀望為主'}
-                    </div>
-                    <div class="confidence">信心指數：${shortTerm.confidence}</div>
-                    <div class="price-targets">
-                        <div class="target-item">
-                            <span>建議買點</span>
-                            <strong class="price-up">${shortTerm.buyPrice}</strong>
-                        </div>
-                        <div class="target-item">
-                            <span>建議賣點</span>
-                            <strong class="price-down">${shortTerm.sellPrice}</strong>
-                        </div>
-                        <div class="target-item">
-                            <span>停損點</span>
-                            <strong>${shortTerm.stopLoss}</strong>
-                        </div>
-                    </div>
-                    <div class="reasons">
-                        <strong>分析理由：</strong>
-                        <ul>
-                            ${shortTerm.reasons.map(r => `<li>${r}</li>`).join('')}
-                        </ul>
-                    </div>
-                </div>
-                
-                <div class="analysis-box">
-                    <h4>📊 長線分析 (${longTerm.period})</h4>
-                    <div class="signal-badge signal-${longTerm.signal}">
-                        ${longTerm.signal === 'buy' ? '建議佈局' : longTerm.signal === 'sell' ? '建議減碼' : '觀望為主'}
-                    </div>
-                    <div class="confidence">信心指數：${longTerm.confidence}</div>
-                    <div class="trend-info">
-                        <div>趨勢判斷：<strong>${longTerm.trend}</strong></div>
-                        <div>目標價：<strong class="price-up">${longTerm.targetPrice}</strong></div>
-                    </div>
-                    <div class="reasons">
-                        <strong>分析理由：</strong>
-                        <ul>
-                            ${longTerm.reasons.map(r => `<li>${r}</li>`).join('')}
-                        </ul>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="disclaimer">
-                ⚠️ 免責聲明：本分析僅供參考，不構成投資建議。投資有風險，請謹慎評估。
-            </div>
-        </div>
-    `;
+        `;
+    }
 }
 
-// 技術指標計算函數
-function calculateSMA(prices, period) {
-    const slice = prices.slice(-period);
-    return slice.reduce((a, b) => a + b, 0) / period;
+// 分析台股
+async function analyzeTWStock(symbol) {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}.TW?interval=1d&range=3mo`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Failed to fetch');
+    const data = await response.json();
+    
+    if (!data.chart || !data.chart.result || !data.chart.result[0]) {
+        throw new Error('Invalid data');
+    }
+    
+    const result = data.chart.result[0];
+    const meta = result.meta;
+    const quotes = result.indicators.quote[0];
+    
+    return {
+        symbol: symbol,
+        name: meta.longName || symbol,
+        price: meta.regularMarketPrice,
+        change: ((meta.regularMarketPrice - meta.chartPreviousClose) / meta.chartPreviousClose) * 100,
+        volume: meta.regularMarketVolume,
+        currency: 'TWD',
+        historicalData: {
+            close: quotes.close.filter(v => v !== null),
+            high: quotes.high.filter(v => v !== null),
+            low: quotes.low.filter(v => v !== null),
+            volume: quotes.volume.filter(v => v !== null)
+        }
+    };
 }
 
+// 分析美股
+async function analyzeUSStock(symbol) {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=3mo`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Failed to fetch');
+    const data = await response.json();
+    
+    if (!data.chart || !data.chart.result || !data.chart.result[0]) {
+        throw new Error('Invalid data');
+    }
+    
+    const result = data.chart.result[0];
+    const meta = result.meta;
+    const quotes = result.indicators.quote[0];
+    
+    return {
+        symbol: symbol,
+        name: meta.longName || symbol,
+        price: meta.regularMarketPrice,
+        change: ((meta.regularMarketPrice - meta.chartPreviousClose) / meta.chartPreviousClose) * 100,
+        volume: meta.regularMarketVolume,
+        currency: meta.currency,
+        historicalData: {
+            close: quotes.close.filter(v => v !== null),
+            high: quotes.high.filter(v => v !== null),
+            low: quotes.low.filter(v => v !== null),
+            volume: quotes.volume.filter(v => v !== null)
+        }
+    };
+}
+
+// 分析加密貨幣
+async function analyzeCrypto(symbol) {
+    const coinId = symbol.toLowerCase();
+    const response = await fetch(`https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=90`);
+    if (!response.ok) throw new Error('Failed to fetch crypto data');
+    const data = await response.json();
+    
+    if (!data.prices || data.prices.length === 0) {
+        throw new Error('No price data available');
+    }
+    
+    const prices = data.prices.map(p => p[1]);
+    const currentPrice = prices[prices.length - 1];
+    const previousPrice = prices[prices.length - 2];
+    
+    return {
+        symbol: symbol,
+        name: symbol,
+        price: currentPrice,
+        change: ((currentPrice - previousPrice) / previousPrice) * 100,
+        volume: 0,
+        currency: 'USD',
+        historicalData: {
+            close: prices,
+            high: prices,
+            low: prices,
+            volume: []
+        }
+    };
+}
+
+// 技術指標計算
+function calculateIndicators(data) {
+    const closes = data.close;
+    const highs = data.high;
+    const lows = data.low;
+    
+    // RSI (14天)
+    const rsi = calculateRSI(closes, 14);
+    
+    // MACD
+    const macd = calculateMACD(closes);
+    
+    // 布林通道
+    const bb = calculateBollingerBands(closes, 20);
+    
+    // 移動平均線
+    const ma5 = calculateMA(closes, 5);
+    const ma20 = calculateMA(closes, 20);
+    const ma60 = calculateMA(closes, 60);
+    
+    // KD指標
+    const kd = calculateKD(highs, lows, closes, 9);
+    
+    return { rsi, macd, bb, ma5, ma20, ma60, kd };
+}
+
+// RSI計算
 function calculateRSI(prices, period = 14) {
     let gains = 0, losses = 0;
+    
     for (let i = prices.length - period; i < prices.length; i++) {
         const change = prices[i] - prices[i - 1];
         if (change > 0) gains += change;
         else losses -= change;
     }
+    
     const avgGain = gains / period;
     const avgLoss = losses / period;
     const rs = avgGain / avgLoss;
-    return 100 - (100 / (1 + rs));
+    const rsi = 100 - (100 / (1 + rs));
+    
+    return rsi;
 }
 
+// MACD計算
 function calculateMACD(prices) {
     const ema12 = calculateEMA(prices, 12);
     const ema26 = calculateEMA(prices, 26);
-    return ema12 - ema26;
+    const macd = ema12 - ema26;
+    const signal = calculateEMA([...prices.slice(-9), macd], 9);
+    const histogram = macd - signal;
+    
+    return { macd, signal, histogram };
 }
 
+// EMA計算
 function calculateEMA(prices, period) {
     const k = 2 / (period + 1);
     let ema = prices[0];
+    
     for (let i = 1; i < prices.length; i++) {
         ema = prices[i] * k + ema * (1 - k);
     }
+    
     return ema;
 }
 
-function analyzeShortTerm(latest, sma5, sma20, rsi, macd) {
-    let signal = 'hold';
-    let confidence = 50;
-    let buyPrice = latest.close * 0.98;
-    let sellPrice = latest.close * 1.02;
-    let stopLoss = latest.close * 0.95;
-    let reasons = [];
-    
-    if (latest.close > sma5 && sma5 > sma20) {
-        signal = 'buy';
-        confidence += 15;
-        reasons.push('短均線上穿長均線，多頭排列');
-    } else if (latest.close < sma5 && sma5 < sma20) {
-        signal = 'sell';
-        confidence += 15;
-        reasons.push('短均線下穿長均線，空頭排列');
-    }
-    
-    if (rsi < 30) {
-        signal = 'buy';
-        confidence += 20;
-        reasons.push('RSI超賣，反彈機會大');
-    } else if (rsi > 70) {
-        signal = 'sell';
-        confidence += 20;
-        reasons.push('RSI超買，回調風險高');
-    }
-    
-    if (macd > 0) {
-        confidence += 10;
-        reasons.push('MACD正值，動能向上');
-    }
+// 移動平均線
+function calculateMA(prices, period) {
+    const slice = prices.slice(-period);
+    return slice.reduce((a, b) => a + b, 0) / period;
+}
+
+// 布林通道
+function calculateBollingerBands(prices, period = 20) {
+    const ma = calculateMA(prices, period);
+    const slice = prices.slice(-period);
+    const variance = slice.reduce((sum, price) => sum + Math.pow(price - ma, 2), 0) / period;
+    const std = Math.sqrt(variance);
     
     return {
-        signal: signal,
-        confidence: Math.min(confidence, 95) + '%',
-        buyPrice: buyPrice.toFixed(2),
-        sellPrice: sellPrice.toFixed(2),
-        stopLoss: stopLoss.toFixed(2),
-        period: '1-5天',
-        reasons: reasons
+        upper: ma + (std * 2),
+        middle: ma,
+        lower: ma - (std * 2)
     };
 }
 
-function analyzeLongTerm(prices, sma20, rsi) {
-    const trend = prices[prices.length - 1] > sma20 ? 'up' : 'down';
-    let signal = 'hold';
-    let confidence = 50;
-    let targetPrice = prices[prices.length - 1] * 1.15;
-    let reasons = [];
+// KD指標
+function calculateKD(highs, lows, closes, period = 9) {
+    const recentHighs = highs.slice(-period);
+    const recentLows = lows.slice(-period);
+    const currentClose = closes[closes.length - 1];
     
-    if (trend === 'up' && rsi < 60) {
-        signal = 'buy';
-        confidence = 75;
-        reasons.push('價格站穩月線，趨勢向上');
-        reasons.push('RSI未過熱，仍有上漲空間');
-    } else if (trend === 'down' && rsi > 50) {
-        signal = 'sell';
-        confidence = 70;
-        reasons.push('價格跌破月線，趨勢轉弱');
+    const highest = Math.max(...recentHighs);
+    const lowest = Math.min(...recentLows);
+    
+    const rsv = ((currentClose - lowest) / (highest - lowest)) * 100;
+    const k = rsv; // 簡化計算
+    const d = calculateMA([rsv], 3);
+    
+    return { k, d };
+}
+
+// AI評分系統
+function calculateAIScore(stockData, indicators) {
+    let score = 50; // 基準分
+    let signals = [];
+    
+    // RSI評分 (30分)
+    if (indicators.rsi < 30) {
+        score += 15;
+        signals.push({ type: 'buy', reason: 'RSI超賣 (<30)', weight: 15 });
+    } else if (indicators.rsi > 70) {
+        score -= 15;
+        signals.push({ type: 'sell', reason: 'RSI超買 (>70)', weight: -15 });
+    } else if (indicators.rsi >= 40 && indicators.rsi <= 60) {
+        score += 5;
+        signals.push({ type: 'neutral', reason: 'RSI中性', weight: 5 });
+    }
+    
+    // MACD評分 (25分)
+    if (indicators.macd.histogram > 0) {
+        score += 12;
+        signals.push({ type: 'buy', reason: 'MACD金叉', weight: 12 });
     } else {
-        reasons.push('盤整格局，建議觀望');
+        score -= 12;
+        signals.push({ type: 'sell', reason: 'MACD死叉', weight: -12 });
     }
     
+    // 布林通道評分 (20分)
+    const currentPrice = stockData.price;
+    if (currentPrice < indicators.bb.lower) {
+        score += 10;
+        signals.push({ type: 'buy', reason: '價格低於布林下軌', weight: 10 });
+    } else if (currentPrice > indicators.bb.upper) {
+        score -= 10;
+        signals.push({ type: 'sell', reason: '價格高於布林上軌', weight: -10 });
+    }
+    
+    // 均線評分 (25分)
+    if (currentPrice > indicators.ma5 && indicators.ma5 > indicators.ma20 && indicators.ma20 > indicators.ma60) {
+        score += 15;
+        signals.push({ type: 'buy', reason: '多頭排列', weight: 15 });
+    } else if (currentPrice < indicators.ma5 && indicators.ma5 < indicators.ma20 && indicators.ma20 < indicators.ma60) {
+        score -= 15;
+        signals.push({ type: 'sell', reason: '空頭排列', weight: -15 });
+    }
+    
+    // KD評分 (額外加分)
+    if (indicators.kd.k < 20 && indicators.kd.d < 20) {
+        score += 8;
+        signals.push({ type: 'buy', reason: 'KD超賣', weight: 8 });
+    } else if (indicators.kd.k > 80 && indicators.kd.d > 80) {
+        score -= 8;
+        signals.push({ type: 'sell', reason: 'KD超買', weight: -8 });
+    }
+    
+    // 限制分數範圍
+    score = Math.max(0, Math.min(100, score));
+    
+    return { score, signals };
+}
+
+// 計算支撐壓力位
+function calculateLevels(stockData, indicators) {
+    const price = stockData.price;
+    const historicalPrices = stockData.historicalData.close;
+    
+    // 支撐位：近期低點、布林下軌、MA60
+    const support1 = Math.min(...historicalPrices.slice(-20));
+    const support2 = indicators.bb.lower;
+    const support3 = indicators.ma60;
+    
+    // 壓力位：近期高點、布林上軌
+    const resistance1 = Math.max(...historicalPrices.slice(-20));
+    const resistance2 = indicators.bb.upper;
+    
+    // 目標價位
+    const targetBuy = (support1 + support2) / 2;
+    const targetSell = (resistance1 + resistance2) / 2;
+    
     return {
-        signal: signal,
-        confidence: Math.min(confidence, 90) + '%',
-        targetPrice: targetPrice.toFixed(2),
-        period: '20-60天',
-        trend: trend === 'up' ? '上升趨勢' : '下降趨勢',
-        reasons: reasons
+        support: [support1, support2, support3].sort((a, b) => b - a),
+        resistance: [resistance1, resistance2].sort((a, b) => a - b),
+        targetBuy,
+        targetSell
     };
 }
 
-// 載入漲跌排行
-async function loadTopMovers() {
-    try {
-        const today = new Date().toISOString().slice(0,10).replace(/-/g, '');
-        const url = `https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=${today}&type=MS`;
-        const response = await fetch(CORS_PROXY + encodeURIComponent(url));
-        const data = await response.json();
-        
-        if (data.stat === 'OK' && data.data9) {
-            document.getElementById('gainers').innerHTML = data.data9.slice(0, 10).map(stock => `
-                <div class="mover-item">
-                    <div class="mover-info">
-                        <div class="mover-symbol">${stock[0]}</div>
-                        <div class="mover-name">${stock[1]}</div>
-                    </div>
-                    <div>
-                        <div style="font-weight: bold;">${stock[2]}</div>
-                        <div class="mover-change price-up">▲ ${stock[3]}</div>
-                    </div>
-                </div>
-            `).join('');
-            
-            document.getElementById('losers').innerHTML = data.data9.slice(-10).reverse().map(stock => `
-                <div class="mover-item">
-                    <div class="mover-info">
-                        <div class="mover-symbol">${stock[0]}</div>
-                        <div class="mover-name">${stock[1]}</div>
-                    </div>
-                    <div>
-                        <div style="font-weight: bold;">${stock[2]}</div>
-                        <div class="mover-change price-down">▼ ${stock[3]}</div>
-                    </div>
-                </div>
-            `).join('');
-        }
-    } catch (error) {
-        document.getElementById('gainers').innerHTML = '<div class="error">載入失敗</div>';
-        document.getElementById('losers').innerHTML = '<div class="error">載入失敗</div>';
-    }
-}
-
-// 自動更新
-function startAutoRefresh() {
-    autoRefreshInterval = setInterval(() => {
-        loadMarketInfo();
-        loadGlobalIndices();
-        loadCryptoData();
-    }, 60000);
-}
-
-function stopAutoRefresh() {
-    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-}
-
-// 初始化
-document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('stockInput').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') searchStock();
-    });
+// 渲染分析結果
+function renderAnalysis(stockData) {
+    const indicators = calculateIndicators(stockData.historicalData);
+    const aiScore = calculateAIScore(stockData, indicators);
+    const levels = calculateLevels(stockData, indicators);
     
-    loadMarketInfo();
-    loadGlobalIndices();
-    loadCryptoData();
-    loadTopMovers();
-    startAutoRefresh();
-});
+    const isPositive = stockData.change >= 0;
+    const changeClass = isPositive ? 'positive' : 'negative';
+    
+    let recommendation, scoreClass;
+    if (aiScore.score >= 70) {
+        recommendation = '強力買入';
+        scoreClass = 'score-buy';
+    } else if (aiScore.score >= 55) {
+        recommendation = '買入';
+        scoreClass = 'score-buy';
+    } else if (aiScore.score >= 45) {
+        recommendation = '持有觀望';
+        scoreClass = 'score-hold';
+    } else if (aiScore.score >= 30) {
+        recommendation = '賣出';
+        scoreClass = 'score-sell';
+    } else {
+        recommendation = '強力賣出';
+        scoreClass = 'score-sell';
+    }
+    
+    const resultDiv = document.getElementById('analysisResult');
+    resultDiv.innerHTML = `
+        <div class="analysis-card">
+            <div class="stock-header">
+                <div class="stock-title">
+                    <h3>${stockData.name} (${stockData.symbol})</h3>
+                    <span style="color: #666;">${stockData.currency}</span>
+                </div>
+                <div class="stock-price">
+                    <div class="price-value">${formatPrice(stockData.price, stockData.currency)}</div>
+                    <div class="price-change ${changeClass}">
+                        ${isPositive ? '+' : ''}${stockData.change.toFixed(2)}%
+                    </div>
+                </div>
+            </div>
+            
+            <div class="analysis-grid">
+                <!-- AI評分 -->
+                <div class="analysis-block">
+                    <h4><i class="fas fa-robot"></i> AI 智能評分</h4>
+                    <div class="score-display">
+                        <div class="score-circle ${scoreClass}">
+                            ${aiScore.score.toFixed(0)}
+                        </div>
+                        <div class="recommendation">${recommendation}</div>
+                        <p style="color: #666; margin-top: 1rem;">綜合技術指標分析</p>
+                    </div>
+                </div>
+                
+                <!-- 技術指標 -->
+                <div class="analysis-block">
+                    <h4><i class="fas fa-chart-bar"></i> 技術指標</h4>
+                    <ul class="indicator-list">
+                        <li>
+                            <span class="indicator-label">RSI (14)</span>
+                            <span class="indicator-value" style="color: ${indicators.rsi < 30 ? 'var(--success)' : indicators.rsi > 70 ? 'var(--danger)' : 'var(--warning)'}">
+                                ${indicators.rsi.toFixed(2)}
+                            </span>
+                        </li>
+                        <li>
+                            <span class="indicator-label">MACD</span>
+                            <span class="indicator-value" style="color: ${indicators.macd.histogram > 0 ? 'var(--success)' : 'var(--danger)'}">
+                                ${indicators.macd.macd.toFixed(2)}
+                            </span>
+                        </li>
+                        <li>
+                            <span class="indicator-label">MA5</span>
+                            <span class="indicator-value">${indicators.ma5.toFixed(2)}</span>
+                        </li>
+                        <li>
+                            <span class="indicator-label">MA20</span>
+                            <span class="indicator-value">${indicators.ma20.toFixed(2)}</span>
+                        </li>
+                        <li>
+                            <span class="indicator-label">MA60</span>
+                            <span class="indicator-value">${indicators.ma60.toFixed(2)}</span>
+                        </li>
+                        <li>
+                            <span class="indicator-label">K值</span>
+                            <span class="indicator-value">${indicators.kd.k.toFixed(2)}</span>
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- 價位建議 -->
+                <div class="analysis-block">
+                    <h4><i class="fas fa-bullseye"></i> 關鍵價位</h4>
+                    <div class="price-levels">
+                        <div class="price-level level-resistance">
+                            <span>壓力位 1</span>
+                            <strong>${levels.resistance[0].toFixed(2)}</strong>
+                        </div>
+                        <div class="price-level level-resistance">
+                            <span>壓力位 2</span>
+                            <strong>${levels.resistance[1].toFixed(2)}</strong>
+                        </div>
+                        <div class="price-level level-target">
+                            <span>目標賣出價</span>
+                            <strong>${levels.targetSell.toFixed(2)}</strong>
+                        </div>
+                        <div class="price-level level-target">
+                            <span>目標買入價</span>
+                            <strong>${levels.targetBuy.toFixed(2)}</strong>
+                        </div>
+                        <div class="price-level level-support">
+                            <span>支撐位 1</span>
+                            <strong>${levels.support[0].toFixed(2)}</strong>
+                        </div>
+                        <div class="price-level level-support">
+                            <span>支撐位 2</span>
+                            <strong>${levels.support[1].toFixed(2)}</strong>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 交易信號 -->
+                <div class="analysis-block">
+                    <h4><i class="fas fa-signal"></i> 交易信號分析</h4>
+                    <ul class="indicator-list">
+                        ${aiScore.signals.map(signal => `
+                            <li>
+                                <span class="indicator-label">${signal.reason}</span>
+                                <span class="indicator-value" style="color: ${signal.weight > 0 ? 'var(--success)' : signal.weight < 0 ? 'var(--danger)' : 'var(--warning)'}">
+                                    ${signal.weight > 0 ? '+' : ''}${signal.weight}
+                                </span>
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+            </div>
+            
+            <div style="margin-top: 2rem; padding: 1rem; background: #fff3cd; border-radius: 8px; color: #856404;">
+                <strong>⚠️ 風險提示：</strong> 本分析僅供參考，不構成投資建議。請根據自身風險承受能力謹慎決策。
+            </div>
+        </div>
+    `;
+}
 
-window.addEventListener('beforeunload', stopAutoRefresh);
+// 載入推薦股票
+async function loadRecommendations() {
+    const recDiv = document.getElementById('recommendedStocks');
+    
+    // 推薦清單（可根據實際分析動態生成）
+    const recommendations = [
+        { symbol: '2330', name: '台積電', score: 85, reason: '技術面強勢，多頭排列', badge: 'strong-buy' },
+        { symbol: 'AAPL', name: 'Apple', score: 78, reason: 'RSI回調至健康區間', badge: 'buy' },
+        { symbol: 'NVDA', name: 'NVIDIA', score: 82, reason: 'AI題材持續發酵', badge: 'strong-buy' },
+        { symbol: 'TSLA', name: 'Tesla', score: 65, reason: '突破關鍵壓力位', badge: 'buy' }
+    ];
+    
+    recDiv.innerHTML = `
+        <div class="rec-grid">
+            ${recommendations.map(rec => `
+                <div class="rec-card">
+                    <div class="rec-header">
+                        <h4>${rec.name} (${rec.symbol})</h4>
+                        <span class="rec-badge badge-${rec.badge}">
+                            ${rec.badge === 'strong-buy' ? '強力買入' : rec.badge === 'buy' ? '買入' : '持有'}
+                        </span>
+                    </div>
+                    <div style="margin: 1rem 0;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <span>AI評分</span>
+                            <strong style="color: var(--primary);">${rec.score}/100</strong>
+                        </div>
+                        <div style="background: #e8f0fe; height: 8px; border-radius: 4px; overflow: hidden;">
+                            <div style="background: var(--primary); height: 100%; width: ${rec.score}%;"></div>
+                        </div>
+                    </div>
+                    <p style="color: #666; font-size: 0.9rem;">${rec.reason}</p>
+                    <button onclick="document.getElementById('stockInput').value='${rec.symbol}'; analyzeStock();" 
+                            style="width: 100%; margin-top: 1rem; padding: 0.75rem; background: var(--primary); color: white; border: none; border-radius: 6px; cursor: pointer;">
+                        查看詳細分析
+                    </button>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+// 格式化價格
+function formatPrice(price, currency) {
+    if (currency === 'TWD') {
+        return `NT$ ${price.toFixed(2)}`;
+    } else if (currency === 'USD') {
+        return `$ ${price.toFixed(2)}`;
+    }
+    return price.toFixed(2);
+}
+
+// 格式化成交量
+function formatVolume(volume) {
+    if (volume >= 1e9) return `${(volume / 1e9).toFixed(2)}B`;
+    if (volume >= 1e6) return `${(volume / 1e6).toFixed(2)}M`;
+    if (volume >= 1e3) return `${(volume / 1e3).toFixed(2)}K`;
+    return volume.toString();
+}
+
+// 頁面載入時初始化
+document.addEventListener('DOMContentLoaded', () => {
+    initDashboard();
+    loadRecommendations();
+    
+    // Enter鍵觸發搜尋
+    document.getElementById('stockInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') analyzeStock();
+    });
+});
